@@ -83,7 +83,11 @@ def detailed_balance_loss(
 
     error = (jnp.squeeze(delta_scores + log_pB - log_pF, axis=-1)
         + log_pi_t[:, -1] - lax.stop_gradient(log_pi_tp1[:, -1]))
-    loss = jnp.mean(optax.huber_loss(error, delta=delta))
+    # Huber loss
+    # loss = jnp.mean(optax.huber_loss(error, delta=delta))
+
+    # squared error
+    loss = jnp.mean(jnp.square(error))
 
     logs = {
         'error': error,

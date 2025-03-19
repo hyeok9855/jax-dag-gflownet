@@ -48,7 +48,7 @@ class GFlowNetDAGEnv(gym.vector.VectorEnv):
         self.num_workers = num_workers
 
         self.num_variables = scorer.num_variables
-        self.local_scores = LRUCache(max_size=cache_max_size)
+        self.local_scores = LRUCache(max_size=cache_max_size)  # MEMO: This contains the parents of the target node as keys
         self._state = None
         self.max_parents = max_parents or self.num_variables
 
@@ -71,7 +71,7 @@ class GFlowNetDAGEnv(gym.vector.VectorEnv):
         shape = (self.num_variables, self.num_variables)
         max_edges = self.num_variables * (self.num_variables - 1) // 2
         observation_space = Dict({
-            'adjacency': Box(low=0., high=1., shape=shape, dtype=np.int_),
+            'adjacency': Box(low=0., high=1., shape=shape, dtype=np.int_),  # MEMO: Edge matrix
             'mask': Box(low=0., high=1., shape=shape, dtype=np.int_),
             'num_edges': Discrete(max_edges),
             'score': Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float_),
@@ -96,7 +96,7 @@ class GFlowNetDAGEnv(gym.vector.VectorEnv):
     def step(self, actions):
         sources, targets = divmod(actions, self.num_variables)
         keys, local_cache, data = self.local_scores_async(sources, targets)
-        dones = (sources == self.num_variables)
+        dones = (sources == self.num_variables)  # MEMO: Done already
         sources, targets = sources[~dones], targets[~dones]
 
         # Make sure that all the actions are valid
@@ -146,36 +146,36 @@ class GFlowNetDAGEnv(gym.vector.VectorEnv):
     def local_scores_async(self, sources, targets):
         keys, local_cache, queued_data = [], set(), []
         for i, (source, target) in enumerate(zip(sources, targets)):
-            if source == self.num_variables:
+            if source == self.num_variables:  # Done already
                 key = (None, None, None)
 
             else:
                 adjacency = self._state['adjacency'][i]
 
                 # Key before adding the new source node
-                indices = tuple(index for index, is_parent
+                indices = tuple(index for index, is_parent  # MEMO: Current parents of the target node
                     in enumerate(adjacency[:, target]) if is_parent)
 
                 # Key after adding the new source node
                 indices_after = list(indices)
                 bisect.insort(indices_after, source)
-                indices_after = tuple(indices_after)
+                indices_after = tuple(indices_after)  # MEMO: Parents of the target node after 
 
-                if not self._is_in_cache((target, indices_after), local_cache):
+                if not self._is_in_cache((target, indices_after), local_cache):  # MEMO: Case when (target, indices_after) is new
                     if not self._is_in_cache((target, indices), local_cache):
-                        data = (indices, indices_after)
+                        data = (indices, indices_after)  # MEMO: Local changes
                         local_cache.update({
                             (target, indices),
                             (target, indices_after)
                         })
-                    else:
+                    else:  # MEMO: Case when both (target, indices) and (target, indices_after) are new
                         data = (indices_after, None)
                         local_cache.add((target, indices_after))
                 elif not self._is_in_cache((target, indices), local_cache):
-                    data = (indices, None)
+                    data = (indices, None)  # MEMO: Case when (target, indices) is new while (target, indices_after) is not
                     local_cache.add((target, indices))
                 else:
-                    data = None
+                    data = None  # MEMO: Both are already in the cache; no need to compute
 
                 if data is not None:
                     queued_data.append((target,) + data)
@@ -184,7 +184,7 @@ class GFlowNetDAGEnv(gym.vector.VectorEnv):
 
                 key = (target, indices, indices_after)
 
-            keys.append(key)
+            keys.append(key)  # For querying the local scores
         return keys, local_cache, queued_data
 
     def local_scores_wait(self, keys, local_cache, data):

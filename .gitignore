@@ -131,3 +131,8 @@ dmypy.json
 # Data
 /data/*
 !/data/.gitkeep
+
+# vscode
+.vscode/
+
+output/

@@ -1,3 +1,4 @@
+import math
 import jax.numpy as jnp
 import numpy as np
 import optax
@@ -58,26 +59,34 @@ def main(args):
 
     # Training loop
     indices = None
-    observations = env.reset()
     with trange(args.prefill + args.num_iterations, desc='Training') as pbar:
         for iteration in pbar:
-            # Sample actions, execute them, and save transitions in the replay buffer
-            epsilon = exploration_schedule(iteration)
-            actions, key, logs = gflownet.act(params.online, key, observations, epsilon)
-            next_observations, delta_scores, dones, _ = env.step(np.asarray(actions))
-            indices = replay.add(
-                observations,
-                actions,
-                # logs['is_exploration'],
-                next_observations,
-                delta_scores,
-                dones,
-                prev_indices=indices
-            )
-            observations = next_observations
+            assert args.batch_size % args.num_envs == 0
+            n_iter_per_batch = args.batch_size // args.num_envs
 
-            if iteration >= args.prefill:
-                # Update the parameters of the GFlowNet
+            # Collect `batch_size` trajectories
+            for _ in range(n_iter_per_batch):
+                observations = env.reset()
+                dones = np.zeros(args.num_envs, dtype=bool)
+                while not dones.all():
+                    # Sample actions, execute them, and save transitions in the replay buffer
+                    epsilon = 0.9  # exploration_schedule(iteration); Doesn't seem to affect too much for small graphs
+                    _actions, key, logs = gflownet.act(params.online, key, observations, epsilon)
+                    actions = np.ones(args.num_envs, dtype=int) * (env.num_variables ** 2)
+                    actions[~dones] = _actions[~dones]
+                    next_observations, delta_scores, dones, _ = env.step(np.asarray(actions))
+                    indices = replay.add(  # This only saves ~done transitions
+                        observations,
+                        actions,
+                        # logs['is_exploration'],
+                        next_observations,
+                        delta_scores,
+                        dones,
+                        prev_indices=indices
+                    )
+                    observations = next_observations
+
+            if iteration > args.prefill and len(replay) >= args.batch_size:
                 samples = replay.sample(batch_size=args.batch_size, rng=rng)
                 params, state, logs = gflownet.step(params, state, samples)
 
@@ -138,18 +147,18 @@ if __name__ == '__main__':
     optimization = parser.add_argument_group('Optimization')
     optimization.add_argument('--lr', type=float, default=1e-5,
         help='Learning rate (default: %(default)s)')
-    optimization.add_argument('--delta', type=float, default=1.,
+    optimization.add_argument('--delta', type=float, default=1.,  # We use L2 use, so this has no effect
         help='Value of delta for Huber loss (default: %(default)s)')
-    optimization.add_argument('--batch_size', type=int, default=32,
+    optimization.add_argument('--batch_size', type=int, default=256,
         help='Batch size (default: %(default)s)')
-    optimization.add_argument('--num_iterations', type=int, default=100_000,
+    optimization.add_argument('--num_iterations', type=int, default=10_000,
         help='Number of iterations (default: %(default)s)')
 
     # Replay buffer
     replay = parser.add_argument_group('Replay Buffer')
     replay.add_argument('--replay_capacity', type=int, default=100_000,
         help='Capacity of the replay buffer (default: %(default)s)')
-    replay.add_argument('--prefill', type=int, default=1000,
+    replay.add_argument('--prefill', type=int, default=100,
         help='Number of iterations with a random policy to prefill '
              'the replay buffer (default: %(default)s)')
     
@@ -164,7 +173,7 @@ if __name__ == '__main__':
     misc = parser.add_argument_group('Miscellaneous')
     misc.add_argument('--num_samples_posterior', type=int, default=1000,
         help='Number of samples for the posterior estimate (default: %(default)s)')
-    misc.add_argument('--update_target_every', type=int, default=1000,
+    misc.add_argument('--update_target_every', type=int, default=1,  # With <=4 nodes, it's fine without target network
         help='Frequency of update for the target network (default: %(default)s)')
     misc.add_argument('--seed', type=int, default=0,
         help='Random seed (default: %(default)s)')
@@ -179,11 +188,11 @@ if __name__ == '__main__':
 
     # Erdos-Renyi Linear-Gaussian graphs
     er_lingauss = subparsers.add_parser('erdos_renyi_lingauss')
-    er_lingauss.add_argument('--num_variables', type=int, required=True,
+    er_lingauss.add_argument('--num_variables', type=int, required=True,  # Use 4 for benchmark
         help='Number of variables')
-    er_lingauss.add_argument('--num_edges', type=int, required=True,
+    er_lingauss.add_argument('--num_edges', type=int, required=True,  # Use 4 for benchmark
         help='Average number of edges')
-    er_lingauss.add_argument('--num_samples', type=int, required=True,
+    er_lingauss.add_argument('--num_samples', type=int, required=True,  # Use 100
         help='Number of samples')
 
     # Flow cytometry data (Sachs) with observational data

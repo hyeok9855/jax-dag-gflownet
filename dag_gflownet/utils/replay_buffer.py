@@ -14,7 +14,7 @@ class ReplayBuffer:
             ('adjacency', np.uint8, (nbytes,)),
             ('num_edges', np.int_, (1,)),
             ('actions', np.int_, (1,)),
-            ('is_exploration', np.bool_, (1,)),
+            # ('is_exploration', np.bool_, (1,)),
             ('delta_scores', np.float_, (1,)),
             ('scores', np.float_, (1,)),
             ('mask', np.uint8, (nbytes,)),
@@ -30,7 +30,7 @@ class ReplayBuffer:
             self,
             observations,
             actions,
-            is_exploration,
+            # is_exploration,
             next_observations,
             delta_scores,
             dones,
@@ -56,7 +56,7 @@ class ReplayBuffer:
             'next_mask': self.encode(next_observations['mask'][~dones]),
 
             # Extra keys for monitoring
-            'is_exploration': is_exploration[~dones],
+            # # 'is_exploration': is_exploration[~dones],
             'scores': observations['score'][~dones],
         }
 
