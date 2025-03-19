@@ -173,7 +173,7 @@ if __name__ == '__main__':
     misc = parser.add_argument_group('Miscellaneous')
     misc.add_argument('--num_samples_posterior', type=int, default=1000,
         help='Number of samples for the posterior estimate (default: %(default)s)')
-    misc.add_argument('--update_target_every', type=int, default=1,  # With <=4 nodes, it's fine without target network
+    misc.add_argument('--update_target_every', type=int, default=1,  # With <=5 nodes, it's fine without target network
         help='Frequency of update for the target network (default: %(default)s)')
     misc.add_argument('--seed', type=int, default=0,
         help='Random seed (default: %(default)s)')
@@ -188,9 +188,9 @@ if __name__ == '__main__':
 
     # Erdos-Renyi Linear-Gaussian graphs
     er_lingauss = subparsers.add_parser('erdos_renyi_lingauss')
-    er_lingauss.add_argument('--num_variables', type=int, required=True,  # Use 4 for benchmark
+    er_lingauss.add_argument('--num_variables', type=int, required=True,  # Use 5 for benchmark
         help='Number of variables')
-    er_lingauss.add_argument('--num_edges', type=int, required=True,  # Use 4 for benchmark
+    er_lingauss.add_argument('--num_edges', type=int, required=True,  # Use 5 for benchmark
         help='Average number of edges')
     er_lingauss.add_argument('--num_samples', type=int, required=True,  # Use 100
         help='Number of samples')
